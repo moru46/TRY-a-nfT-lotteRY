@@ -22,6 +22,7 @@ contract Lottery {
     address payable[] public players; //lottery players
     mapping (address => PlayerAccountTickets) private playersTickets; 
     bool public isActive; //to know if the round is active or not
+    bool public prizeOk; //to know if the prize has been given to the players or not
     uint public constant duration = 100; //number of blocks 
     uint public roundClosing;
     uint public blockNumber; //number of the first block related to a specific round
@@ -31,11 +32,12 @@ contract Lottery {
     kittyNft nft;
     mapping (uint => nftPrize) collectibles; //in this mapping, each key correspond to a collectibles, where the rank of the collectibles is inside it
 
-    uint [] private arrayIndex ;
+    //uint [] private arrayIndex ;
 
     constructor() {
         lotteryOperator = msg.sender;
-        isActive = false; 
+        isActive = false;
+        prizeOk = true;
     }
 
     //total amount for this round
@@ -48,7 +50,9 @@ contract Lottery {
     function startRound() public  {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isActive == false, "Wait the end of previous round before starting a new one");
+        require(prizeOk == true, "Lottery Operator must give the prize to players before start a new round");
         isActive = true; //start new round
+        prizeOk = false;
         blockNumber = block.number;
         roundClosing = blockNumber + duration; //from the first block up to the n' block
 
@@ -81,7 +85,7 @@ contract Lottery {
     //if there is a round active, otherwise the function returns an error code.
     //TODO: checks how to pass the number choose by the player
     function buy(uint _numbers) public payable {
-        require(isActive == false, "Round is not active, wait fot new one!");
+        require(isActive == false, "Round is not active, wait for new one!");
         require(msg.value > .01 ether, "Minimum fee is required to buy a ticket"); //require to enter the lottery and buy a ticket
 
         //TODO get the numbers from input and check the input value
@@ -165,6 +169,10 @@ contract Lottery {
     }
 
     function closeLottery() public {
+         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+         require(isActive == true, "Round is active, wait for the end of it!");
+
+
 
     }
 
