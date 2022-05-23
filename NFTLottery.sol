@@ -7,7 +7,8 @@ import "contracts/artifacts/NFT_KITTY.sol";
 struct PlayerAccountTickets{
     mapping (uint => uint []) ticketList; //for each key, it contains the 5 numbers + special number
     uint nTicket;
-    uint nMatches;
+    uint [] nMatches; //for each ticket, store the number of matches
+    uint [] nMatchesPB; //for each ticket, store if the special number has been found
 }
 
 struct nftPrize {
@@ -24,7 +25,7 @@ contract Lottery {
     uint public constant duration = 100; //number of blocks 
     uint public roundClosing;
     uint public blockNumber; //number of the first block related to a specific round
-    uint []  public numbersDrawn; 
+    uint [] public numbersDrawn; 
     
     //nft
     kittyNft nft;
@@ -100,33 +101,68 @@ contract Lottery {
         }
     }
 
-    function drawNumbers() public view {
-        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+    //used by the lottery operator to draw numbers of the current lottery round
+    function drawNumbers(uint K) public returns(uint[] memory){ 
+        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator"); 
+        // Considering that a block is mined every 12 seconds on average,  
+        // waiting other 25 means waiting other 5 minutes to draw numebrs. 
+        require(block.number >= duration + 25, "Too early to draw numbers");
 
+        isActive = false; //stop the current round and start to drawn the numbers
+ 
+        //idea: use block.timestamp as random variable K
 
-    } 
+        bytes32 bhash = blockhash(duration + block.timestamp); 
+        bytes memory bytesArray = new bytes(32); 
+        for (uint i; i <32; i++){ 
+            bytesArray[i] =bhash[i]; 
+        } 
+        bytes32 rand=keccak256(bytesArray); 
+        for (uint i=0; i<5; i++){ 
+    
+            uint x = (uint(rand) % 69) + 1;
+            numbersDrawn[i] = x;
+            //check if the number is repeated or not
+            for (uint j = 0; j < i; j++){
+                if ( x == numbersDrawn[j] ){
+                    //in case of repetiton, i do another draw for that position
+                    i -= 1;
+                }
+            }
+        }
 
-    //players who takes part to this lottery round
-    /*function getPlayers() public view returns (address payable[] memory) {
-        return players;
-    }*/
+        numbersDrawn[5] = (uint(rand) % 26) + 1; //powerball number
 
-    function getRandomNumber() public view returns (uint) {
-        return uint(keccak256(abi.encodePacked(lotteryOperator, block.timestamp)));
     }
 
-    /*function pickWinner() public {
-        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
-        uint index = getRandomNumber() % players.length;
-        players[index].transfer(address(this).balance);
+    //players who takes part to this lottery round
+    function getPlayers() public view returns (address payable[] memory) {
+        return players;
+    }
 
-       // lotteryHistory[lotteryId] = players[index];
-       // lotteryId++;
-        
-
-        // reset the state of the contract
-        players = new address payable[](0);
+    /*function getRandomNumber() public view returns (uint) {
+        return uint(keccak256(abi.encodePacked(lotteryOperator, block.timestamp)));
     }*/
+
+    //check the winners of the lottery by inspecting al the tickets
+    function checkWinners() public {
+        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+        
+        for (uint i = 0; i < players.length; i++){
+            for ( uint j = 1; j <= playersTickets[players[i]].nTicket; j++){
+                for ( uint k = 0; k < 6; k++ ){
+                    if ( k == 5 ){
+                        if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
+                            playersTickets[players[i]].nMatchesPB[j] = 1;
+                        }
+                    }
+                    if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
+                            playersTickets[players[i]].nMatches[j] += 1;
+                        }
+                }
+            }
+        }
+    }
 
     function closeLottery() public {
 
