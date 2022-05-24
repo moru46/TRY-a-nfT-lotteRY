@@ -51,6 +51,9 @@ contract Lottery {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isActive == false, "Wait the end of previous round before starting a new one");
         require(prizeOk == true, "Lottery Operator must give the prize to players before start a new round");
+        
+        players = new address payable[](0);
+
         isActive = true; //start new round
         prizeOk = false;
         blockNumber = block.number;
@@ -84,12 +87,22 @@ contract Lottery {
     //that ticket are passed as input of the function. The function checks 
     //if there is a round active, otherwise the function returns an error code.
     //TODO: checks how to pass the number choose by the player
-    function buy(uint _numbers) public payable {
+    function buy(uint [] memory _numbers) public payable returns (bool){
         require(isActive == false, "Round is not active, wait for new one!");
         require(msg.value > .01 ether, "Minimum fee is required to buy a ticket"); //require to enter the lottery and buy a ticket
 
         //TODO get the numbers from input and check the input value
+        uint nlen = _numbers.length;
+        require( nlen == 6, "You must choice six numbers to play!");
 
+        for( uint i = 0; i < nlen; i++){
+            if(i != 5){
+                require( _numbers[i] >= 1 && _numbers[i] <= 69);
+            }
+            else {
+                require( _numbers[i] >= 1 && _numbers[i] <= 26);
+            }
+        }
 
         //TODO check if there are some repetitions and notify it
         
@@ -97,16 +110,18 @@ contract Lottery {
         uint num = playersTickets[msg.sender].nTicket;
         //if nTicket == 1, is the first ticket for that user, so i add him to the array of user
         if ( num == 1 ){
-            //add the player to the array
-            players.push(payable(msg.sender));
+            players.push(payable(msg.sender)); //add the player to the array
         }
         for(uint i = 0; i < 6; i++){
-            playersTickets[msg.sender].ticketList[num].push(_numbers); //add the list of numbers
+            playersTickets[msg.sender].ticketList[num].push(_numbers[i]); //add the list of numbers
         }
+
+        return true;
     }
 
     //used by the lottery operator to draw numbers of the current lottery round
-    function drawNumbers(uint K) public returns(uint[] memory){ 
+    //function drawNumbers(uint K) public returns(uint[] memory){
+    function drawNumbers() public returns(bool){ 
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator"); 
         // Considering that a block is mined every 12 seconds on average,  
         // waiting other 25 means waiting other 5 minutes to draw numebrs. 
@@ -136,7 +151,7 @@ contract Lottery {
         }
 
         numbersDrawn[5] = (uint(rand) % 26) + 1; //powerball number
-
+        return true;
     }
 
     //players who takes part to this lottery round
@@ -148,12 +163,40 @@ contract Lottery {
         return uint(keccak256(abi.encodePacked(lotteryOperator, block.timestamp)));
     }*/
 
-    //check the winners of the lottery by inspecting al the tickets
+    //check the winners of the lottery by inspecting all the tickets
     function checkWinners() public {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         
         for (uint i = 0; i < players.length; i++){
             for ( uint j = 1; j <= playersTickets[players[i]].nTicket; j++){
+                uint totMatch = 0;
+                for ( uint k = 0; k < 6; k++ ){
+                    if ( k == 5 ){
+                        if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
+                            playersTickets[players[i]].nMatchesPB.push(1);
+                        }
+                        else {
+                             playersTickets[players[i]].nMatchesPB.push(0);
+                        }
+                        playersTickets[players[i]].nMatches.push(totMatch);
+                    }
+                    if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
+                            totMatch += 1;
+                           // playersTickets[players[i]].nMatches[j-1] += 1;
+                        }
+                }
+            }
+        }
+    }
+
+    //used by lottery operator to distribute the prizes of the current lottery round
+    //inspect all the result in playersTickets and gives the prize to the player
+    //if one prize has been already assigned to a player, will be generated a new one of the same rank
+    function givePrizes() public {
+        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+
+        for (uint i = 0; i < players.length; i++){
+            for ( uint j = 0; j < playersTickets[players[i]].nMatches.length; j++){
                 for ( uint k = 0; k < 6; k++ ){
                     if ( k == 5 ){
                         if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
@@ -166,7 +209,9 @@ contract Lottery {
                 }
             }
         }
-    }
+
+    } 
+
 
     function closeLottery() public {
          require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
