@@ -21,7 +21,7 @@ struct nftPrize {
 }
 
 contract Lottery {
-    address public lotteryOperator;
+    address payable public lotteryOperator;
     address payable[] public players; //lottery players
     mapping (address => PlayerAccountTickets) private playersTickets; 
     bool public isActive; //to know if the round is active or not
@@ -31,18 +31,21 @@ contract Lottery {
     uint public blockNumber; //number of the first block related to a specific round
     uint [] public numbersDrawn;
     uint public Kvalue; //parameter for the numbers drawn
+    bool public prizeGiven;
+    uint public constant ticketPrize = 1 gwei;
     
     //nft
     kittyNft nft;
- //   mapping (uint => nftPrize) collectibles; //in this mapping, each key correspond to a collectibles, where the rank of the collectibles is inside it
+    //mapping (uint => nftPrize) collectibles; //in this mapping, each key correspond to a collectibles, where the rank of the collectibles is inside it
     nftPrize [] public collectibles;
     //uint [] private arrayIndex ;
 
     constructor(uint _K){
-        lotteryOperator = msg.sender;
+        lotteryOperator = payable(msg.sender);
         isActive = false;
         isLotteryActive = true;
         Kvalue = _K;
+        prizeGiven = true;
     }
 
     //TODO: generate the nft prize when start new round
@@ -51,11 +54,9 @@ contract Lottery {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == false, "Lottery is not active at the moment");
         require(isActive == false, "Wait the end of previous round before starting a new one");
-       // require(prizeOk == true, "Lottery Operator must give the prize to players before start a new round");
-        
-        players = new address payable[](0); //remove all previous players
-        //playersTickets = new mapping (address => PlayerAccountTickets);
+        require(prizeGiven == false, "You must give prize to players before starting a new round");
 
+        prizeGiven = false;
         isActive = true; //start new round
         blockNumber = block.number;
         roundClosing = blockNumber + duration; //from the first block up to the n' block
@@ -64,7 +65,7 @@ contract Lottery {
             if( collectibles[i].assigned == false) //if there are some prize not assignen, i do not regenerate another one and reuse it
                 continue;
             nft = new kittyNft();
-            collectibles[i].tokenId = nft.mint("");
+            collectibles[i].tokenId = nft.mint(i);
             collectibles[i].nft = nft;
             collectibles[i].rank = i+1;
             collectibles[i].assigned = false;
@@ -72,20 +73,14 @@ contract Lottery {
         }
     }
 
-    function closeRound() public payable {
-        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
-        require(isLotteryActive == false, "Lottery is not active at the moment");
-        require(isActive == false, "A new round must be started before calling closeRound");
-    }
-
     //Allows users to buy a ticket. The numbers picked by a user in 
     //that ticket are passed as input of the function. The function checks 
     //if there is a round active, otherwise the function returns an error code.
     //TODO: checks how to pass the number choose by the player
     function buy(uint [] memory _numbers) public payable returns (bool){
-        require(isActive == false, "Round is not active, wait for new one!");
-        require(isLotteryActive == false, "Lottery is not active at the moment");        
-        require(msg.value == 1 ether, "Fee of 1 ether is required to buy a ticket"); //require to enter the lottery and buy a ticket
+        require(isLotteryActive == false, "Lottery is not active at the moment"); 
+        require(isActive == false, "Round is not active, wait for new one!");       
+        require(msg.value == 1 gwei, "Fee of 1 gwei is required to buy a ticket"); //require to enter the lottery and buy a ticket
 
         //TODO get the numbers from input and check the input value
         uint nlen = _numbers.length;
@@ -164,17 +159,11 @@ contract Lottery {
         }
 
         numbersDrawn[5] = (uint(rand) % 26) + 1; //powerball number
+
+        givePrizes();
+
         return true;
     }
-
-    //players who takes part to this lottery round
-    function getPlayers() public view returns (address payable[] memory) {
-        return players;
-    }
-
-    /*function getRandomNumber() public view returns (uint) {
-        return uint(keccak256(abi.encodePacked(lotteryOperator, block.timestamp)));
-    }*/
 
     //check the winners of the lottery by inspecting all the tickets
     //
@@ -246,46 +235,37 @@ contract Lottery {
                     //assegna classe 8
                     prizeToAssign = 8;
 
-                
+                //assign the prize and mint a new one
+                uint tokendIdWin = nft.getTokenOfClass(prizeToAssign);
+                nft.awardItem(players[i],tokendIdWin);
+                mint(prizeToAssign);
 
             }
         }        
+
+        prizeGiven = true;
+        lotteryOperator.transfer(address(this).balance);
+
+        players = new address payable[](0); //remove all previous players
+        
+        //TODO inizializzare mapping ticket
     }
 
-    //used by lottery operator to distribute the prizes of the current lottery round
-    //inspect all the result in playersTickets and gives the prize to the player
-    //if one prize has been already assigned to a player, will be generated a new one of the same rank
-   /* function givePrizes() public {
-        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+    function mint(uint _classNFT) public {
         require(isLotteryActive == false, "Lottery is not active at the moment");
-
-        for (uint i = 0; i < players.length; i++){
-            for ( uint j = 0; j < playersTickets[players[i]].nMatches.length; j++){
-                for ( uint k = 0; k < 6; k++ ){
-                    if ( k == 5 ){
-                        if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
-                            playersTickets[players[i]].nMatchesPB[j] = 1;
-                        }
-                    }
-                    if ( numbersDrawn[k] == playersTickets[players[i]].ticketList[j][k] ){
-                            playersTickets[players[i]].nMatches[j] += 1;
-                        }
-                }
-            }
-        }
-
-    } */
+        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+        nft.mint(_classNFT);
+    }
 
 
-    function closeLottery() public {
+    function closeLottery() public payable{
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == false, "Lottery is not active at the moment");
 
         isLotteryActive = false; //deactivate the lottery
         //TODO: rimborsare i giocatori
-
-
-
+        if(isActive && !prizeGiven)
+            for(uint i = 0; i < players.length; i++)
+                players[i].transfer(ticketPrize*playersTickets[players[i]].nTicket);
     }
-
 }
