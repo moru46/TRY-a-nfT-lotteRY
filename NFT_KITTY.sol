@@ -10,14 +10,29 @@ contract kittyNft is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 
-    constructor() ERC721("kittyNft", "ITM") {}
+    address public owner;
+    mapping (uint => uint) public rank;
+    mapping (uint => string) public description;
 
-    function mint(string memory tokenURI) public returns (uint256)
+
+    constructor() ERC721("kittyNft", "ITM") {
+
+    }
+
+
+
+    function mint(uint class) public returns (uint256)
     {
         uint256 newItemId = _tokenIds.current();
-        _setTokenURI(newItemId, tokenURI);
+        //_setTokenURI(newItemId, tokenURI);
         _tokenIds.increment();
+        rank[class] = newItemId;
+        string memory prefix = "NFT class: ";
         return newItemId;
+    }
+
+    function getTokenOfClass(uint class) public view returns (uint){
+        return rank[class];
     }
 
     function awardItem(address player, uint256 tokendId) public {
