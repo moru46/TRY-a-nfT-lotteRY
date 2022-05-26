@@ -63,7 +63,7 @@ contract Lottery {
         for(uint i=0; i<8;i++){
             if( collectibles[i].assigned == false) //if there are some prize not assignen, i do not regenerate another one and reuse it
                 continue;
-            nft = new kittyNft(i+1,"pippo");
+            nft = new kittyNft();
             collectibles[i].tokenId = nft.mint("");
             collectibles[i].nft = nft;
             collectibles[i].rank = i+1;
@@ -91,16 +91,24 @@ contract Lottery {
         uint nlen = _numbers.length;
         require( nlen == 6, "You must choice six numbers to play!");
 
+        bool[69] memory pickedNumbers;
+        for( uint i = 0; i < 69;i++)
+            pickedNumbers[i] = false;
+
         for( uint i = 0; i < nlen; i++){
             if(i != 5){
-                require( _numbers[i] >= 1 && _numbers[i] <= 69);
+                require( _numbers[i] >= 1 && _numbers[i] <= 69, "Number out of range");
+                require( !pickedNumbers[_numbers[i]-1], "Duplicated number are not allowed" );
+
+                pickedNumbers[_numbers[i]-1] = true;
             }
             else {
                 require( _numbers[i] >= 1 && _numbers[i] <= 26);
+                require( !pickedNumbers[_numbers[i]-1], "Duplicated number are not allowed" );
+
+                pickedNumbers[_numbers[i]-1] = true;
             }
         }
-
-        //TODO check if there are some repetitions and notify it
         
         playersTickets[msg.sender].nTicket += 1; //add new ticket to the list
         uint num = playersTickets[msg.sender].nTicket;
@@ -126,8 +134,10 @@ contract Lottery {
         require(block.number >= duration + Kvalue, "Too early to draw numbers");
 
         isActive = false; //stop the current round and start to drawn the numbers
- 
-        //idea: use block.timestamp as random variable K
+
+        bool[69] memory pickedNumbers;
+        for( uint i = 0; i < 69;i++)
+            pickedNumbers[i] = false;
 
         bytes32 bhash = blockhash(duration + Kvalue); 
         bytes memory bytesArray = new bytes(32); 
@@ -140,12 +150,17 @@ contract Lottery {
             uint x = (uint(rand) % 69) + 1;
             numbersDrawn[i] = x;
             //check if the number is repeated or not
-            for (uint j = 0; j < i; j++){
+            if( !pickedNumbers[x-1] )
+                i -= 1;
+            else {
+                pickedNumbers[x-1] = true;
+            }
+            /*for (uint j = 0; j < i; j++){
                 if ( x == numbersDrawn[j] ){
                     //in case of repetiton, i do another draw for that position
                     i -= 1;
                 }
-            }
+            }*/
         }
 
         numbersDrawn[5] = (uint(rand) % 26) + 1; //powerball number
@@ -162,7 +177,11 @@ contract Lottery {
     }*/
 
     //check the winners of the lottery by inspecting all the tickets
-    function checkWinners() public {
+    //
+    //used by lottery operator to distribute the prizes of the current lottery round
+    //inspect all the result in playersTickets and gives the prize to the player
+    //if one prize has been already assigned to a player, will be generated a new one of the same rank
+    function givePrizes() public {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == false, "Lottery is not active at the moment");
         
@@ -186,12 +205,57 @@ contract Lottery {
                 }
             }
         }
+
+        for (uint i = 0; i < players.length; i++){ //for each player in the lottery round
+            for ( uint j = 0; j < playersTickets[players[i]].nMatches.length; j++){ //for each ticket
+                uint match1 = playersTickets[players[i]].nMatches[j];
+                uint match2 = playersTickets[players[i]].nMatchesPB[j];
+                uint prizeToAssign;
+
+                if (match1 == 5 && match2 == 1)
+                    //assegna classe 1
+                    prizeToAssign = 1;
+                else if ( match1 == 5 && match2 == 0)
+                    //assegna classe 2
+                    prizeToAssign = 2;
+                else if (match1 == 4 && match2 == 1)
+                    //assegna classe 3
+                    prizeToAssign = 3;
+                else if (match1 == 4 && match2 == 0)
+                    //assegna classe 4
+                    prizeToAssign = 4;
+                else if (match1 == 3 && match2 == 1)
+                    //assegna classe 4
+                    prizeToAssign = 4;
+                else if (match1 == 3 && match2 == 0)
+                    //assegna classe 5
+                    prizeToAssign = 5;
+                else if (match1 == 2 && match2 == 1)
+                    //assegna classe 5
+                    prizeToAssign = 5;
+                else if (match1 == 2 && match2 == 0)
+                    //assegna classe 6
+                    prizeToAssign = 6;
+                else if (match1 == 1 && match2 == 1)
+                    //assegna classe 6
+                    prizeToAssign = 6;
+                else if (match1 == 1 && match2 == 0)
+                    //assegna classe 7
+                    prizeToAssign = 7;
+                else if (match1 == 0 && match2 == 1)
+                    //assegna classe 8
+                    prizeToAssign = 8;
+
+                
+
+            }
+        }        
     }
 
     //used by lottery operator to distribute the prizes of the current lottery round
     //inspect all the result in playersTickets and gives the prize to the player
     //if one prize has been already assigned to a player, will be generated a new one of the same rank
-    function givePrizes() public {
+   /* function givePrizes() public {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == false, "Lottery is not active at the moment");
 
@@ -210,7 +274,7 @@ contract Lottery {
             }
         }
 
-    } 
+    } */
 
 
     function closeLottery() public {
