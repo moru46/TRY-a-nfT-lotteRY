@@ -17,10 +17,10 @@ contract Lottery {
     mapping (address => PlayerAccountTickets) private playersTickets; 
     bool public isActive; //to know if the round is active or not
     bool public isLotteryActive; //to know if the prize has been given to the players or not
-    uint public constant duration = 100; //number of blocks 
+    uint public constant duration = 2; //number of blocks 5 for test
     uint public roundClosing;
     uint public blockNumber; //number of the first block related to a specific round
-    uint [] public numbersDrawn;
+    uint [6] public numbersDrawn;
     uint public Kvalue; //parameter for the numbers drawn
     bool public prizeGiven;
     uint public constant ticketPrize = 1 gwei;
@@ -28,16 +28,13 @@ contract Lottery {
     //nft
     kittyNft nft;
 
-    constructor() {
+    constructor(uint _K) {
         lotteryOperator = msg.sender;
         isActive = false;
         isLotteryActive = true;
-        Kvalue = 5;
+        Kvalue = _K;
         prizeGiven = true;
-
-        //for(uint i=0; i<8;i++){
-       //      nft.mint(i+1);
-       // }
+        nft = new kittyNft();
 
     }
 
@@ -48,6 +45,14 @@ contract Lottery {
     event mintNewNft(string result);
     event closeLotteryEvent(string result);
     event closeLotteryAndRefund(string result);
+    event refundLotteryOp(string result);
+
+    function mint(uint _classNFT) public {
+        require(isLotteryActive == true, "Lottery is not active at the moment");
+        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
+        nft.mint(_classNFT);
+        emit mintNewNft("Lottery Operator has minted a new NFT Token");
+    }
 
     //TODO: generate the nft prize when start new round
     // checks if the previous round is finished, and, if that's the case, starts a new round.
@@ -62,6 +67,10 @@ contract Lottery {
         blockNumber = block.number;
         roundClosing = blockNumber + duration; //from the first block up to the n' block
 
+        for(uint i=0; i<8;i++){
+          nft.mint(i+1);
+        }
+
         emit newRound("New round is on!");
 
     }
@@ -73,7 +82,7 @@ contract Lottery {
     function buy(uint [] memory _numbers) public payable returns (bool){
         require(isLotteryActive == true, "Lottery is not active at the moment"); 
         require(isActive == true, "Round is not active, wait for new one!");       
-        require(msg.value == 1 gwei, "Fee of 1 gwei is required to buy a ticket"); //require to enter the lottery and buy a ticket
+        require(msg.value == 5 gwei, "Fee of 1 gwei is required to buy a ticket"); //require to enter the lottery and buy a ticket
 
         //TODO get the numbers from input and check the input value
         uint nlen = _numbers.length;
@@ -85,14 +94,13 @@ contract Lottery {
 
         for( uint i = 0; i < nlen; i++){
             if(i != 5){
-                require( _numbers[i] >= 1 && _numbers[i] <= 69, "Number out of range");
+                require( _numbers[i] >= 1 && _numbers[i] <= 69, "Number out of range: 1-69");
                 require( !pickedNumbers[_numbers[i]-1], "Duplicated number are not allowed" );
 
                 pickedNumbers[_numbers[i]-1] = true;
             }
             else {
-                require( _numbers[i] >= 1 && _numbers[i] <= 26);
-                require( !pickedNumbers[_numbers[i]-1], "Duplicated number are not allowed" );
+                require( _numbers[i] >= 1 && _numbers[i] <= 26, "Number out of range: 1-26");
 
                 pickedNumbers[_numbers[i]-1] = true;
             }
@@ -112,7 +120,6 @@ contract Lottery {
         return true;
     }
 
-    //TODO check the time for drawn
     //used by the lottery operator to draw numbers of the current lottery round
     function drawNumbers() public payable returns(bool){ 
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
@@ -130,24 +137,28 @@ contract Lottery {
         bytes32 bhash = blockhash(duration + Kvalue); 
         bytes memory bytesArray = new bytes(32);
         
-        for (uint i; i <32; i++)
-            bytesArray[i] =bhash[i]; 
+        for (uint i=0; i<6; i++){ 
 
-        bytes32 rand=keccak256(bytesArray); 
-        for (uint i=0; i<5; i++){ 
-    
+            for (uint j = 0; j <32; j++)
+                bytesArray[j] = bhash[j];
+
+            bytes32 rand = keccak256(bytesArray); 
+
             uint x = (uint(rand) % 69) + 1;
             numbersDrawn[i] = x;
             //check if the number is repeated or not
-            if( !pickedNumbers[x-1] )
+            if( pickedNumbers[x-1] )
                 i -= 1;
             else {
                 pickedNumbers[x-1] = true;
             }
 
-        }
+            if( i == 5)
+                numbersDrawn[5] = (uint(rand) % 26) + 1; //powerball number
 
-        numbersDrawn[5] = (uint(rand) % 26) + 1; //powerball number
+            bhash = bhash ^ rand; //xor for each position in bhash
+
+        }
 
         emit newDrawn("Lottery Operator has drawn the winning numbers! Let's see the winners");
 
@@ -235,6 +246,7 @@ contract Lottery {
 
         prizeGiven = true;
         payable(lotteryOperator).transfer(address(this).balance);
+        emit refundLotteryOp("Lottery Operator has been refund!");
 
         for(uint i = 0; i < players.length; i++){
             uint tickNumb = playersTickets[players[i]].nTicket;
@@ -250,14 +262,6 @@ contract Lottery {
         players = new address payable[](0); //remove all previous players
 
     }
-
-    function mint(uint _classNFT) public {
-        require(isLotteryActive == true, "Lottery is not active at the moment");
-        require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
-        nft.mint(_classNFT);
-        emit mintNewNft("Lottery Operator has minted a new NFT Token");
-    }
-
 
     function closeLottery() public payable{
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
