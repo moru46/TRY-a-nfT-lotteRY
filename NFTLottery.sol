@@ -17,11 +17,11 @@ contract Lottery {
     mapping (address => PlayerAccountTickets) private playersTickets; 
     bool public isActive; //to know if the round is active or not
     bool public isLotteryActive; //to know if the prize has been given to the players or not
-    uint public constant duration = 2; //number of blocks 5 for test
+    uint public constant duration = 5; //number of blocks 5 for test
     uint public roundClosing;
     uint public blockNumber; //number of the first block related to a specific round
     uint [6] public numbersDrawn;
-    uint public Kvalue; //parameter for the numbers drawn
+    uint public valueK; //parameter for the numbers drawn
     bool public prizeGiven;
     uint public constant ticketPrize = 1 gwei;
     
@@ -32,9 +32,13 @@ contract Lottery {
         lotteryOperator = msg.sender;
         isActive = false;
         isLotteryActive = true;
-        Kvalue = _K;
+        valueK = _K;
         prizeGiven = true;
         nft = new kittyNft();
+
+        for(uint i=0; i<8;i++){
+          nft.mint(i+1);
+        }
 
     }
 
@@ -56,7 +60,7 @@ contract Lottery {
 
     //TODO: generate the nft prize when start new round
     // checks if the previous round is finished, and, if that's the case, starts a new round.
-    function startRound() public  {
+    function startNewRound() public  {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == true, "Lottery is not active at the moment");
         require(isActive == false, "Wait the end of previous round before starting a new one");
@@ -66,10 +70,6 @@ contract Lottery {
         isActive = true; //start new round
         blockNumber = block.number;
         roundClosing = blockNumber + duration; //from the first block up to the n' block
-
-        for(uint i=0; i<8;i++){
-          nft.mint(i+1);
-        }
 
         emit newRound("New round is on!");
 
@@ -82,7 +82,8 @@ contract Lottery {
     function buy(uint [] memory _numbers) public payable returns (bool){
         require(isLotteryActive == true, "Lottery is not active at the moment"); 
         require(isActive == true, "Round is not active, wait for new one!");       
-        require(msg.value == 5 gwei, "Fee of 1 gwei is required to buy a ticket"); //require to enter the lottery and buy a ticket
+        require(msg.value == 5 gwei, "Fee of 5 gwei is required to buy a ticket"); //require to enter the lottery and buy a ticket
+        require(block.number <= roundClosing, "Round is over, try later");
 
         //TODO get the numbers from input and check the input value
         uint nlen = _numbers.length;
@@ -126,7 +127,7 @@ contract Lottery {
         require(isLotteryActive == true, "Lottery is not active at the moment");
         // Considering that a block is mined every 12 seconds on average,  
         // waiting other 25 means waiting other 5 minutes to draw numebrs. 
-        require(block.number >= duration + Kvalue, "Too early to draw numbers");
+        require(block.number >= roundClosing + valueK, "Too early to draw numbers");
 
         isActive = false; //stop the current round and start to drawn the numbers
 
@@ -134,7 +135,8 @@ contract Lottery {
         for( uint i = 0; i < 69;i++)
             pickedNumbers[i] = false;
 
-        bytes32 bhash = blockhash(duration + Kvalue); 
+        //bytes32 bhash = blockhash(duration + valueK);
+        bytes32 bhash = keccak256(abi.encodePacked(block.difficulty, block.timestamp, duration + valueK));
         bytes memory bytesArray = new bytes(32);
         
         for (uint i=0; i<6; i++){ 
@@ -142,7 +144,8 @@ contract Lottery {
             for (uint j = 0; j <32; j++)
                 bytesArray[j] = bhash[j];
 
-            bytes32 rand = keccak256(bytesArray); 
+            bytes32 rand = keccak256(bytesArray);
+            
 
             uint x = (uint(rand) % 69) + 1;
             numbersDrawn[i] = x;
