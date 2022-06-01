@@ -14,12 +14,7 @@ contract kittyNft is ERC721URIStorage {
     mapping (uint => uint) public rank;
     mapping (uint => string) public description;
 
-
-    constructor() ERC721("kittyNft", "ITM") {
-
-    }
-
-
+    constructor() ERC721("kittyNft", "ITM") {}
 
     function mint(uint class) public returns (uint256)
     {
@@ -27,7 +22,7 @@ contract kittyNft is ERC721URIStorage {
         //_setTokenURI(newItemId, tokenURI);
         _tokenIds.increment();
         rank[class] = newItemId;
-        string memory prefix = "NFT class: ";
+        description[class] = string(abi.encodePacked("NFT class: ", Strings.toString(class)));
         return newItemId;
     }
 
