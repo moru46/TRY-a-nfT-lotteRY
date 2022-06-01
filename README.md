@@ -5,4 +5,6 @@ The lottery logic is implemented with a Solidity smart contract on the Ethereum 
 Before  operating the lottery, the lottery manager buys a batch of collectibles, mints a Non Fungible Token (NFT) for each of them.
 Each lottery’s winner may receive as a prize one of thesecollectibles.
 
-This contract has been developed using the IDE Remix with Ganache Provider.
+This contract has been developed using the IDE Remix with Ganache as provider for the blockchain.
+
+
