@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.11;
 
-import "contracts/artifacts/NFT_KITTY.sol";
+import "contracts/NFT_KITTY.sol";
 
 struct PlayerAccountTickets{
     mapping (uint => uint []) ticketList; //for each key, it contains the 5 numbers + special number
@@ -16,23 +16,24 @@ contract Lottery {
     address payable[] public players; //lottery players
     mapping (address => PlayerAccountTickets) private playersTickets; 
     bool public isActive; //to know if the round is active or not
-    bool public isLotteryActive; //to know if the prize has been given to the players or not
-    uint public constant duration = 5; //number of blocks 5 for test
+    bool public isLotteryActive; 
+    uint public duration; //number of blocks 5 for test
     uint public roundClosing;
     uint public blockNumber; //number of the first block related to a specific round
     uint [6] public numbersDrawn;
     uint public valueK; //parameter for the numbers drawn
-    bool public prizeGiven;
-    uint public constant ticketPrize = 1 gwei;
+    bool public prizeGiven; //to know if the prize has been given to the players or not
+    uint public constant ticketPrize = 5 gwei;
     
     //nft
     kittyNft nft;
 
-    constructor(uint _K) {
+    constructor(uint _K, uint _duration) {
         lotteryOperator = msg.sender;
         isActive = false;
         isLotteryActive = true;
         valueK = _K;
+        duration = _duration;
         prizeGiven = true;
         nft = new kittyNft();
 
@@ -122,7 +123,7 @@ contract Lottery {
     }
 
     //used by the lottery operator to draw numbers of the current lottery round
-    function drawNumbers() public payable returns(bool){ 
+    function drawNumbers() public payable{ 
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == true, "Lottery is not active at the moment");
         // Considering that a block is mined every 12 seconds on average,  
@@ -165,9 +166,10 @@ contract Lottery {
 
         emit newDrawn("Lottery Operator has drawn the winning numbers! Let's see the winners");
 
+        //to test using lottery_test.js, this function must be commented
+        //this due to some problems with the IDE REMIX which crash due lack of memroy
         givePrizes();
 
-        return true;
     }
 
     //check the winners of the lottery by inspecting all the tickets
