@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.11;
 
-import "contracts/NFT_KITTY.sol";
+import "contracts/nft_kitty.sol";
 
 struct PlayerAccountTickets{
     mapping (uint => uint []) ticketList; //for each key, it contains the 5 numbers + special number
@@ -123,7 +123,7 @@ contract Lottery {
     }
 
     //used by the lottery operator to draw numbers of the current lottery round
-    function drawNumbers() public payable{ 
+    function drawNumbers() public { 
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == true, "Lottery is not active at the moment");
         // Considering that a block is mined every 12 seconds on average,  
@@ -268,7 +268,7 @@ contract Lottery {
 
     }
 
-    function closeLottery() public payable{
+    function closeLottery() public {
         require(msg.sender == lotteryOperator, "This function is only for the Lottery Operator");
         require(isLotteryActive == true, "Lottery is not active at the moment");
 
