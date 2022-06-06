@@ -10,5 +10,5 @@ This contract has been developed using the IDE Remix with Ganache as provider fo
 * **lotteryNFT.sol**: contract of the NFT lottery.
 * **nft_kitty.sol**: contract use to generate the NFT using the ERC721 standard for Non Fungible Token
 * **lottery_test.js**: JS script to test the code, using remix test unit
-* **lottery.zip**: it contains the remix workspace use to develop the project. To run it, just import the zip to Remix
+
 
